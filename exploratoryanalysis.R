@@ -1,9 +1,9 @@
 setwd("~/GitHub/fantasy_dota")
-library(ggplot2)
-library(dplyr)
-library(gridExtra)
+source("functions.R")
 
 rawdata <- read.csv("dota_fantasy_raw.csv")
+players <- read.csv("playerdata.csv", stringsAsFactors = FALSE)
+teams <- unique(players[,c("team_id", "team_name")])
 
 fantasydata <- data.frame("matchID" = rawdata$match_id,
                           "playerID" = rawdata$account_id,
@@ -21,54 +21,18 @@ fantasydata <- data.frame("matchID" = rawdata$match_id,
                           "stuns" = rawdata$stuns * 0.05)
 fantasydata$total <- rowSums(fantasydata[3:14])
 
-players <- unique(fantasydata$playerID)
 
 
-eg <- data.frame("playerName" = c("Arteezy", "SumaiL", "Universe", "zai", "Cr1t-"),
-                 "playerID" = c(86745912, 111620041, 87276347, 73562326, 25907144),
-                 "Position" = c(1,2,3,4,5), stringsAsFactors = FALSE)
-
-densityplot <- function(x, playerinfo, stat = "total", xlim){
-  
-  playerName <- as.character(playerinfo[1])
-  ID <- playerinfo[2]
-  position <- playerinfo[3]
-  
-  playerdata <- filter(x, playerID == ID[[1]])
-  
-  p <- ggplot(playerdata, aes_string(stat)) + stat_density(geom="step")
-  p <- p + labs(title = playerName, x = paste(stat, "points", sep = " ")) + geom_vline(aes(xintercept = mean(playerdata[,stat])))
-  if(!missing(xlim)){return(p + xlim(xlim))}
-  else{return(p)}
-}
+eg <- subset(players, players$team_id == 39)
 
 densityplot(fantasydata, eg[1,], xlim=c(0,35))
-
-rtz <- subset(fantasydata, fantasydata$playerID == 86745912)
-ggplot(rtz, aes(eval(as.symbol("total")))) + stat_density(geom="step") + xlim(0,35)
-
-teamdensity <- function(x, team, stat = "total", xlim){
-  #apply(team, 1, densityplot, x=x)
-  
-  plots <- list()
-  if(missing(xlim)){
-    for(i in seq(1:5)){
-      plots[[i]] <- densityplot(x, team[i,], stat = stat)
-    }
-  }else{
-    for(i in seq(1:5)){
-      plots[[i]] <- densityplot(x, team[i,], stat = stat, xlim = xlim)
-    }
-    }
-  arrangeGrob(plots[[1]], plots[[2]], plots[[3]], plots[[4]], plots[[5]], ncol=1)
-}
-
-
 
 egtotal <- teamdensity(fantasydata, eg, xlim = c(0,35))
 egGPM <- teamdensity(fantasydata, eg, stat = "GPM")
 
 
+testcardA <- list(player = "SumaiL", deaths = 5, GPM = 5, roshkills = 10, teamfight = 20, firstblood = 15)
+testcardB <- list(player = "Matumbaman", kills = 5, deaths = 5, CS = 10, GPM = 15, firstblood = 15)
 
-
+comparecards(testcardA, testcardB, fantasydata, players)
 
