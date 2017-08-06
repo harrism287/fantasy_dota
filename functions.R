@@ -48,6 +48,11 @@ cardscores <- function(card, data, players){
   
   playerdata <- filter(data, playerID == ID)
   #print(summary(playerdata))
+  
+  if(length(card) == 1){
+    return(playerdata)
+  }
+  
   for(i in seq(2, length(card), 1)){
     #print(names(card)[[i]])
     playerdata[,names(card)[i]] <- playerdata[,names(card)[[i]]] * (1 + (card[[i]]/100))
@@ -90,8 +95,25 @@ comparecards <- function(cardA, cardB, data, players){
   
 }
 
+printcard <- function(card){
+  
+}
 
-
-
+makecard <- function(player, kills, deaths, CS, GPM, towerkills, roshkills,
+                     teamfight, wards, stacks, runes, firstblood, stuns){
+  if(missing(player)){stop("No player")}
+  
+  argg <- as.list(environment())
+  
+  card <- list()
+  
+  for(stat in names(argg)){
+    if(argg[[stat]] > 0){
+      card[[stat]] <- argg[[stat]]
+    }
+  }
+  
+  return(card)
+}
 
 
