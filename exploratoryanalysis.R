@@ -66,6 +66,6 @@ comparecards(card_crit, card_gh, fantasydata, players)
 
 testcards <- importcards("../../../Desktop/testcards.csv", fantasydata, players)
 
-
+rsconnect::deployApp(appFiles = c("app.R", "functions.R", "nobonus.csv", "playerdata.csv"))
 
 

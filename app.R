@@ -23,19 +23,19 @@ ui <- fluidPage(
                 
       ),
       helpText("The input file should be in CSV format with one card per line."),
-      selectInput("displayscore", "Choose a score to display:", 
+      selectInput("displayscore", "Choose a fantasy stat:", 
                   c("kills", "deaths", "CS", "GPM", "towerkills", "roshkills",
                     "teamfight", "wards", "stacks", "runes", "firstblood", "stuns", "total"),
                   selected = "total"),
-      selectInput("displaystat", "Choose a statistic for sorting/plotting:",
+      selectInput("displaystat", "Choose a statistic for sorting:",
                   c("min", "mean", "med", "max", "sd", "mad"),
                   selected = "mean"),
       checkboxInput("dec", "sort descending", value = T),
-      selectInput("displaypos", "Select a position to filter the list",
+      selectInput("displaypos", "Select a fantasy position to filter the list",
                   c("all", "core", "offlane", "support"),
                   selected = "all"),
       checkboxInput("makeplot", "plot data", value = T),
-      actionButton("statdetails", "What do these stats mean?")
+      actionButton("statdetails", "Column descriptions")
     ),
     mainPanel(
       tableOutput("maintable"),
@@ -97,12 +97,12 @@ server <- function(input, output) {
   
   observeEvent(input$statdetails, {
     showModal(modalDialog(HTML("min - minimum, the lowest value <br>
-                            mean - your \"standard\" average, skewed by extreme values <br>
+                            mean - traditional \"average\", can be skewed by extreme values <br>
                             med - median, the middle value when ranked low-high, more robust to extreme values <br>
                             max - maximum, the highest value <br>
-                            sd - standard deviation, measure of variability around the mean, skewed by extreme values <br>
-                            mad - median absolute deviation, measure of variability around the median, more robust to extreme values"),
-                          title = "Overview of stats shown",
+                            sd - standard deviation, measure of variability, can be skewed by extreme values <br>
+                            mad - median absolute deviation, measure of variability, more robust to extreme values"),
+                          title = "",
                           easyClose = T
     ))
   })
