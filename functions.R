@@ -6,6 +6,7 @@ library(scales)
 library(httr)
 library(jsonlite)
 library(stats)
+library(ggthemes)
 
 getrawdata <- function(url, path){
   raw <- GET(url = url, path = path)
@@ -149,6 +150,7 @@ importcards <- function(filename, data, players){
     carddata[[cards[i,1]]]$cardstats <- cards[i,]
     carddata[[cards[i,1]]]$scores <- cardscores(cards[i,], data, players)
     carddata[[cards[i,1]]]$scoresums <- statsummary(carddata[[i]]$scores)
+    carddata[[cards[i,1]]]$playerinfo <- getplayerinfo(cards[i,2], players)
   }
   return(carddata)
 }
@@ -164,6 +166,82 @@ sumtable <- function(cards, stat, players){
   row.names(table) <- names(cards)
   
   return(table)
+  
+}
+
+violinplot <- function(cards, stat = "total", players, xlim){
+  
+  fulltable <- NULL
+  names <- names(cards)
+  
+  for(i in 1:length(cards)){
+    
+    currtable <- cards[[i]]$scores[,2:15]
+    
+    currtable$card <- rep(names[[i]], nrow(currtable))
+    
+    playerdata <- getplayerinfo(cards[[i]]$scores$playerID[[1]], players)
+    
+    currtable$pos <- rep(playerdata$fantasy_role, nrow(currtable))
+    
+    fulltable <- rbind(fulltable, currtable)
+  }
+  
+  p <- ggplot(fulltable, aes_string(x = "card", y = stat)) + expand_limits(y=0)
+  p <- p + geom_violin(fill = "paleturquoise", color = "turquoise4", size = 1.5)
+  p <- p + stat_summary(fun.y = mean, geom="point", size = 3, color = "turquoise4")
+  p <- p + theme_minimal() + theme(text = element_text(size = 20))
+  p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  
+  p
+  
+}
+
+heatmap <- function(cards, stat = "total", players, xlim){
+  
+  fulltable <- NULL
+  names <- names(cards)
+  
+  for(i in 1:length(cards)){
+    
+    currtable <- cards[[i]]$scores[,2:15]
+    
+    currtable$card <- rep(names[[i]], nrow(currtable))
+    
+    playerdata <- getplayerinfo(cards[[i]]$scores$playerID[[1]], players)
+    
+    currtable$pos <- rep(playerdata$fantasy_role, nrow(currtable))
+    
+    fulltable <- rbind(fulltable, currtable)
+  }
+  
+  p <- ggplot(fulltable, aes_string(x = "card", y = stat)) + expand_limits(y=0)
+  p <- p + stat_density2d(aes(alpha=..density.., fill=..density..))
+  p
+  
+}
+
+posfilter <- function(cards, pos){
+  if(pos == "all"){
+    return(cards)
+  }
+  
+  cores <- list()
+  offs <- list()
+  sups <- list()
+  
+  cardnames <- names(cards)
+  
+  for(i in 1:length(cards)){
+    
+     switch(cards[[i]]$playerinfo$fantasy_role,
+            cores[[cardnames[[i]]]] <- cards [[i]],
+            sups[[cardnames[[i]]]] <- cards[[i]],
+            offs[[cardnames[[i]]]] <- cards[[i]])
+  }
+  
+  return(switch(pos, "core" = cores, "support" = sups, "offlane" = offs))
   
 }
 

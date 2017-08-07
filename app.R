@@ -27,15 +27,20 @@ ui <- fluidPage(
                   c("kills", "deaths", "CS", "GPM", "towerkills", "roshkills",
                     "teamfight", "wards", "stacks", "runes", "firstblood", "stuns", "total"),
                   selected = "total"),
-      selectInput("displaystat", "Choose a statistic for sorting:",
+      selectInput("displaystat", "Choose a statistic for sorting/plotting:",
                   c("min", "mean", "med", "max", "sd", "mad"),
                   selected = "mean"),
-      checkboxInput("dec", "Sort decreasing?", value = T),
+      checkboxInput("dec", "sort descending", value = T),
+      selectInput("displaypos", "Select a position to filter the list",
+                  c("all", "core", "offlane", "support"),
+                  selected = "all"),
+      checkboxInput("makeplot", "plot data", value = T),
       actionButton("statdetails", "What do these stats mean?")
     ),
     mainPanel(
       tableOutput("maintable"),
-      textOutput("caption")
+      textOutput("caption"),
+      plotOutput("plot")
     )
   )
 )
@@ -47,14 +52,15 @@ server <- function(input, output) {
   output$maintable <- renderTable({
     
     inputcards <- input$usercards
-    if (is.null(inputcards))
-      return(NULL)
+    if (is.null(inputcards)){
+      carddata <- importcards("nobonus.csv", fantasydata, players)
+    }else{
+      carddata <- importcards(inputcards$datapath, fantasydata, players)
+    }
     
-    carddata <- importcards(inputcards$datapath, fantasydata, players)
+    carddata <- posfilter(carddata, input$displaypos)
     
     summarytable <- sumtable(carddata, input$displayscore, players)
-    
-    caption = paste("Showing ", input$displayscore, " points sorted by ", input$displaystat, ".", sep = "")
     
     if(input$dec){
       summarytable[order(summarytable[,input$displaystat], decreasing = T),]
@@ -65,10 +71,29 @@ server <- function(input, output) {
   }, rownames = TRUE)
   
   output$caption <- renderText({
-    if (is.null(input$usercards))
-      return(NULL)
     paste("Showing ", input$displayscore, " points sorted by ", input$displaystat, ".", sep = "")
   })
+  
+  output$plot <- renderPlot({
+    
+    inputcards <- input$usercards
+    if (is.null(inputcards)){
+      carddata <- importcards("nobonus.csv", fantasydata, players)
+    }else{
+      carddata <- importcards(inputcards$datapath, fantasydata, players)
+    }
+    
+    carddata <- posfilter(carddata, input$displaypos)
+
+    p <- violinplot(carddata, input$displayscore, players)
+    
+    if(input$makeplot){
+      return(p)
+    }else{
+      return(NULL)
+    }
+  })
+  
   
   observeEvent(input$statdetails, {
     showModal(modalDialog(HTML("min - minimum, the lowest value <br>
