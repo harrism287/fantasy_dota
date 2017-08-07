@@ -3,6 +3,33 @@ library(plyr)
 library(dplyr)
 library(gridExtra)
 library(scales)
+library(httr)
+library(jsonlite)
+library(stats)
+
+getrawdata <- function(url, path){
+  raw <- GET(url = url, path = path)
+  return(as.data.frame(fromJSON(rawToChar(raw$content))$rows))
+}
+
+fantasycalc <- function(rawdata){
+  fantasydata <- data.frame("matchID" = rawdata$match_id,
+                            "playerID" = rawdata$account_id,
+                            "kills" = rawdata$kills * 0.3,
+                            "deaths" = 3 - (rawdata$deaths * 0.3),
+                            "CS" = (rawdata$lasthits + rawdata$denies) * 0.003,
+                            "GPM" = rawdata$gpm * 0.002,
+                            "towerkills" = rawdata$towerkills,
+                            "roshkills" = rawdata$roshkills,
+                            "teamfight" = rawdata$teamfight * 3,
+                            "wards" = rawdata$wards * 0.5,
+                            "stacks" = rawdata$stacks * 0.5,
+                            "runes" = rawdata$runes * 0.25,
+                            "firstblood" = rawdata$firstblood * 4,
+                            "stuns" = rawdata$stuns * 0.05)
+  fantasydata$total <- rowSums(fantasydata[3:14])
+  return(fantasydata)
+}
 
 getplayerinfo <- function(player, players){
   if(is.numeric(player)){players[players$account_id == player,]}
@@ -49,14 +76,16 @@ cardscores <- function(card, data, players){
   playerdata <- filter(data, playerID == ID)
   #print(summary(playerdata))
   
-  if(length(card) == 1){
-    return(playerdata)
-  }
   
-  for(i in seq(2, length(card), 1)){
-    #print(names(card)[[i]])
-    playerdata[,names(card)[i]] <- playerdata[,names(card)[[i]]] * (1 + (card[[i]]/100))
-  }
+  
+  # if(length(card) == 1){
+  #   return(playerdata)
+  # }
+  # 
+   for(i in seq(3, length(card), 1)){
+     #print(names(card)[[i]])
+     playerdata[,names(card)[i]] <- playerdata[,names(card)[[i]]] * (1 + (card[[i]]/100))
+   }
   
   playerdata$total <- rowSums(playerdata[3:14])
   
@@ -95,7 +124,46 @@ comparecards <- function(cardA, cardB, data, players){
   
 }
 
-printcard <- function(card){
+statsummary <- function(statdata){
+  
+  statsum <- data.frame()
+  
+  for(stat in names(statdata[,3:15])){
+
+    statsum[stat, "min"] = min(statdata[,stat])
+    statsum[stat, "mean"] = mean(statdata[,stat])
+    statsum[stat, "med"] = median(statdata[,stat])
+    statsum[stat, "max"] = max(statdata[,stat])
+    statsum[stat, "sd"] = sd(statdata[,stat])
+    statsum[stat, "mad"] = mad(statdata[,stat])
+  }
+  return(statsum)
+}
+
+importcards <- function(filename, data, players){
+  cards <- as.data.frame(read.csv(filename, header = TRUE, stringsAsFactors = FALSE))
+  
+  carddata <- list()
+  
+  for(i in 1:nrow(cards)){
+    carddata[[cards[i,1]]]$cardstats <- cards[i,]
+    carddata[[cards[i,1]]]$scores <- cardscores(cards[i,], data, players)
+    carddata[[cards[i,1]]]$scoresums <- statsummary(carddata[[i]]$scores)
+  }
+  return(carddata)
+}
+
+sumtable <- function(cards, stat, players){
+  
+  table <- NULL
+
+  for(card in cards){
+    table<- rbind(table, card$scoresums[stat,])
+  }
+  
+  row.names(table) <- names(cards)
+  
+  return(table)
   
 }
 
