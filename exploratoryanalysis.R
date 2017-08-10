@@ -10,6 +10,7 @@ fantasydata <- fantasycalc(rawdata)
 players <- read.csv("playerdata.csv", stringsAsFactors = FALSE)
 teams <- unique(players[,c("team_id", "team_name")])
 
+fantasydata <- merge(players, fantasydata)
 
 eg <- subset(players, players$team_id == 39)
 

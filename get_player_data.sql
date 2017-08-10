@@ -5,7 +5,8 @@ notable_players.account_id,
 notable_players.name,
 notable_players.fantasy_role,
 notable_players.team_id,
-notable_players.team_name
+notable_players.team_name,
+notable_players.country_code
 FROM matches
 JOIN match_patch using(match_id)
 JOIN leagues using(leagueid)

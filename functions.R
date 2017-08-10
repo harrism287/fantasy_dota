@@ -32,60 +32,15 @@ fantasycalc <- function(rawdata){
   return(fantasydata)
 }
 
-getplayerinfo <- function(player, players){
-  if(is.numeric(player)){players[players$account_id == player,]}
-  else{return(players[pmatch(tolower(player), tolower(players$name)),])}
-}
+cardscores <- function(card, data){
 
-densityplot <- function(x, playerinfo, stat = "total", xlim, title){
-  
-  
-  ID <- playerinfo[[1]]
-  #print(ID)
-  playerName <- playerinfo[[2]]
-  if(missing(title)){title <- playerName}
-  #print(playerName)
-  position <- playerinfo[[3]]
-  #print(position)
-  
-  playerdata <- filter(x, playerID == ID)
-  
-  p <- ggplot(playerdata, aes_string(stat)) + stat_density(geom="step")
-  p <- p + labs(title = title, x = paste(stat, "points", sep = " ")) + geom_vline(aes(xintercept = mean(playerdata[,stat])))
-  if(!missing(xlim)){return(p + xlim(xlim))}
-  else{return(p)}
-}
+  cardinfo <- card$cardinfo
+  playerdata <- filter(data, playerID == cardinfo$playerID)
+  stats <- names(cardinfo)[8:length(cardinfo)]
 
-teamdensity <- function(x, team, stat = "total", xlim){
-  
-  plots <- list()
-  if(missing(xlim)){
-    for(i in seq(1:5)){
-      plots[[i]] <- densityplot(x, team[i,], stat = stat)
-    }
-  }else{
-    for(i in seq(1:5)){
-      plots[[i]] <- densityplot(x, team[i,], stat = stat, xlim = xlim)
-    }
-  }
-  arrangeGrob(plots[[1]], plots[[2]], plots[[3]], plots[[4]], plots[[5]], ncol=1)
-}
-
-cardscores <- function(card, data, players){
-  ID <- getplayerinfo(card$player, players)$account_id
-  
-  playerdata <- filter(data, playerID == ID)
-  #print(summary(playerdata))
-  
-  
-  
-  # if(length(card) == 1){
-  #   return(playerdata)
-  # }
-  # 
-   for(i in seq(3, length(card), 1)){
+   for(stat in stats){
      #print(names(card)[[i]])
-     playerdata[,names(card)[i]] <- playerdata[,names(card)[[i]]] * (1 + (card[[i]]/100))
+     playerdata[,stat] <- playerdata[,stat] * (1 + (cardinfo[[stat]]/100))
    }
   
   playerdata$total <- rowSums(playerdata[3:14])
@@ -93,44 +48,10 @@ cardscores <- function(card, data, players){
   return(playerdata)
 }
 
-comparecards <- function(cardA, cardB, data, players){
-  
-  scoresA <- cardscores(cardA, data, players)
-  scoresB <- cardscores(cardB, data, players)
-  
-  #print(summary(scoresA))
-  #print(summary(scoresB))
-  
-  meanDiff <- mean(scoresA$total) - mean(scoresB$total)
-  mannwhitney <- wilcox.test(scoresA$total, scoresB$total)
-  
-  if(meanDiff > 0){
-    print(paste("Card A is better by", round(meanDiff, 2),
-                "points, with a p-value of", scientific(mannwhitney$p.value, 3), sep=" "))
-  }else if(meanDiff < 0){
-    print(paste("Card B is better by", round((-1 * meanDiff), 2), "points.",
-                "points, with a p-value of", scientific(mannwhitney$p.value, 3), sep=" "))
-  }else{
-    print("It's a tie!")
-  }
-  
-  maxscore <- max(c(scoresA$total, scoresB$total))
-  
-  lim <- c(0, round_any(maxscore, 5, ceiling))
-  
-  plotA <- densityplot(scoresA, getplayerinfo(cardA$player, players), title = "CardA", xlim = lim)
-  plotB <- densityplot(scoresB, getplayerinfo(cardB$player, players), title = "CardB", xlim = lim)
-  
-  grid.arrange(plotA, plotB, ncol = 2)
-  
-}
-
 statsummary <- function(statdata){
   
   statsum <- data.frame()
-  
   for(stat in names(statdata[,3:15])){
-
     statsum[stat, "min"] = min(statdata[,stat])
     statsum[stat, "mean"] = mean(statdata[,stat])
     statsum[stat, "med"] = median(statdata[,stat])
@@ -142,28 +63,34 @@ statsummary <- function(statdata){
 }
 
 importcards <- function(filename, data, players){
-  cards <- as.data.frame(read.csv(filename, header = TRUE, stringsAsFactors = FALSE))
+  cardtable <- as.data.frame(read.csv(filename, header = TRUE, stringsAsFactors = FALSE))
   
-  carddata <- list()
+  cards <- list()
   
-  for(i in 1:nrow(cards)){
-    carddata[[cards[i,1]]]$cardstats <- cards[i,]
-    carddata[[cards[i,1]]]$scores <- cardscores(cards[i,], data, players)
-    carddata[[cards[i,1]]]$scoresums <- statsummary(carddata[[i]]$scores)
-    carddata[[cards[i,1]]]$playerinfo <- getplayerinfo(cards[i,2], players)
+  for(i in 1:nrow(cardtable)){
+    cards[[cardtable[i,1]]]$cardinfo <- merge(players, cardtable[i,])
+    cards[[cardtable[i,1]]]$scores <- cardscores(cards[[cardtable[i,1]]], data)
+    cards[[cardtable[i,1]]]$scoresums <- statsummary(cards[[cardtable[i,1]]]$scores)
   }
-  return(carddata)
+  return(cards)
 }
 
-sumtable <- function(cards, stat, players){
+sumtable <- function(cards, stat){
   
-  table <- NULL
-
+  table <- data.frame()
+  cardnames <- names(cards)
+  
+  i = 1
   for(card in cards){
-    table<- rbind(table, card$scoresums[stat,])
+    
+    table <- rbind(table, data.frame(cardnames[i],card$cardinfo[,c("playerName", "team_name", "fantasy_role")]
+                           ,card$scoresums[stat,]))
+    i <- i + 1
   }
   
-  row.names(table) <- names(cards)
+
+  colnames(table) <- c("Card", "Player", "Team", "Role", "Minimum", "Mean", "Median",
+                       "Maximum", "Standard Deviation", "Median Absolute Deviation")
   
   return(table)
   
@@ -180,9 +107,7 @@ violinplot <- function(cards, stat = "total", players, xlim){
     
     currtable$card <- rep(names[[i]], nrow(currtable))
     
-    playerdata <- getplayerinfo(cards[[i]]$scores$playerID[[1]], players)
-    
-    currtable$pos <- rep(playerdata$fantasy_role, nrow(currtable))
+    currtable$pos <- rep(cards[[i]]$cardinfo$fantasy_role, nrow(currtable))
     
     fulltable <- rbind(fulltable, currtable)
   }
@@ -209,9 +134,7 @@ heatmap <- function(cards, stat = "total", players, xlim){
     
     currtable$card <- rep(names[[i]], nrow(currtable))
     
-    playerdata <- getplayerinfo(cards[[i]]$scores$playerID[[1]], players)
-    
-    currtable$pos <- rep(playerdata$fantasy_role, nrow(currtable))
+    currtable$pos <- rep(cards[[i]]$cardinfo$fantasy_role, nrow(currtable))
     
     fulltable <- rbind(fulltable, currtable)
   }
@@ -222,44 +145,25 @@ heatmap <- function(cards, stat = "total", players, xlim){
   
 }
 
-posfilter <- function(cards, pos){
-  if(pos == "all"){
+filtercards <- function(cards, key){
+  
+  if(is.null(key)){
     return(cards)
   }
-  
-  cores <- list()
-  offs <- list()
-  sups <- list()
+
+  returnlist <- list()
   
   cardnames <- names(cards)
   
   for(i in 1:length(cards)){
-    
-     switch(cards[[i]]$playerinfo$fantasy_role,
-            cores[[cardnames[[i]]]] <- cards [[i]],
-            sups[[cardnames[[i]]]] <- cards[[i]],
-            offs[[cardnames[[i]]]] <- cards[[i]])
-  }
-  
-  return(switch(pos, "core" = cores, "support" = sups, "offlane" = offs))
-  
-}
-
-makecard <- function(player, kills, deaths, CS, GPM, towerkills, roshkills,
-                     teamfight, wards, stacks, runes, firstblood, stuns){
-  if(missing(player)){stop("No player")}
-  
-  argg <- as.list(environment())
-  
-  card <- list()
-  
-  for(stat in names(argg)){
-    if(argg[[stat]] > 0){
-      card[[stat]] <- argg[[stat]]
+    if(cards[[i]]$cardinfo$team_name %in% key |
+       cards[[i]]$cardinfo$fantasy_role %in% key){
+      returnlist[[cardnames[[i]]]] <- cards[[i]]
     }
   }
-  
-  return(card)
+  return(returnlist)
 }
+
+
 
 

@@ -8,8 +8,13 @@ rawdata <- getrawdata(url, path)
 fantasydata <- fantasycalc(rawdata)
 
 players <- read.csv("playerdata.csv", stringsAsFactors = FALSE)
-teams <- unique(players[,c("team_id", "team_name")])
 
+for(i in 1:nrow(players)){
+  players[i,"fantasy_role"] <- switch(as.character(players[i,"fantasy_role"]),
+                                      "1" = "core", "3" = "offlane", "2" = "support")
+}
+
+teams <- unique(players[,c("team_id", "team_name")])
 
 
 ui <- fluidPage(
@@ -23,23 +28,22 @@ ui <- fluidPage(
                 
       ),
       helpText("The input file should be in CSV format with one card per line."),
-      selectInput("displayscore", "Choose a fantasy stat:", 
+      selectInput("displayscore", "Fantasy stat:", 
                   c("kills", "deaths", "CS", "GPM", "towerkills", "roshkills",
                     "teamfight", "wards", "stacks", "runes", "firstblood", "stuns", "total"),
                   selected = "total"),
-      selectInput("displaystat", "Choose a statistic for sorting:",
-                  c("min", "mean", "med", "max", "sd", "mad"),
-                  selected = "mean"),
+      selectInput("displaystat", "Sort by:",
+                  c("Minimum", "Mean", "Median", "Maximum", "Standard Deviation", "Median Absolute Deviation"),
+                  selected = "Mean"),
       checkboxInput("dec", "sort descending", value = T),
-      selectInput("displaypos", "Select a fantasy position to filter the list",
-                  c("all", "core", "offlane", "support"),
-                  selected = "all"),
-      checkboxInput("makeplot", "plot data", value = T),
-      actionButton("statdetails", "Column descriptions")
+      selectInput("displaypos", "Fantasy roles:",
+                  c("core", "offlane", "support"), multiple = T),
+      selectInput("displayteam", "Team:",
+                  teams$team_name, multiple = T),
+      checkboxInput("makeplot", "plot data", value = T)
     ),
     mainPanel(
       tableOutput("maintable"),
-      textOutput("caption"),
       plotOutput("plot")
     )
   )
@@ -47,7 +51,7 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   
-  
+  tags$head(tags$style("maintable  {white-space: nowrap;  }"))
   
   output$maintable <- renderTable({
     
@@ -58,9 +62,15 @@ server <- function(input, output) {
       carddata <- importcards(inputcards$datapath, fantasydata, players)
     }
     
-    carddata <- posfilter(carddata, input$displaypos)
+    summarytable <- sumtable(carddata, input$displayscore)
     
-    summarytable <- sumtable(carddata, input$displayscore, players)
+    if(!is.null(input$displayteam)){
+      summarytable <- filter(summarytable, Team %in% input$displayteam)
+    }
+    if(!is.null(input$displaypos)){
+      summarytable <- filter(summarytable, Role %in% input$displaypos)
+    }
+    
     
     if(input$dec){
       summarytable[order(summarytable[,input$displaystat], decreasing = T),]
@@ -68,44 +78,30 @@ server <- function(input, output) {
       summarytable[order(summarytable[,input$displaystat], decreasing = F),]
     }
     
-  }, rownames = TRUE)
-  
-  output$caption <- renderText({
-    paste("Showing ", input$displayscore, " points sorted by ", input$displaystat, ".", sep = "")
   })
-  
+
   output$plot <- renderPlot({
-    
+
+    if(!input$makeplot){
+      return(NULL)
+    }
+
     inputcards <- input$usercards
     if (is.null(inputcards)){
       carddata <- importcards("nobonus.csv", fantasydata, players)
     }else{
       carddata <- importcards(inputcards$datapath, fantasydata, players)
     }
-    
-    carddata <- posfilter(carddata, input$displaypos)
+
+    carddata <- filtercards(carddata, input$displaypos)
+    carddata <- filtercards(carddata, input$displayteam)
 
     p <- violinplot(carddata, input$displayscore, players)
-    
-    if(input$makeplot){
-      return(p)
-    }else{
-      return(NULL)
-    }
+
+    return(p)
+
   })
-  
-  
-  observeEvent(input$statdetails, {
-    showModal(modalDialog(HTML("min - minimum, the lowest value <br>
-                            mean - traditional \"average\", can be skewed by extreme values <br>
-                            med - median, the middle value when ranked low-high, more robust to extreme values <br>
-                            max - maximum, the highest value <br>
-                            sd - standard deviation, measure of variability, can be skewed by extreme values <br>
-                            mad - median absolute deviation, measure of variability, more robust to extreme values"),
-                          title = "",
-                          easyClose = T
-    ))
-  })
+
 }
 
 shinyApp(ui, server)
